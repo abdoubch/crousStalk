@@ -1,0 +1,41 @@
+name: Crous Toulouse Watcher
+
+on:
+  schedule:
+    # Toutes les 5 minutes (GitHub peut retarder un peu, ce n'est pas garanti a la minute pres)
+    - cron: "*/5 * * * *"
+  workflow_dispatch: {}  # permet de le lancer manuellement depuis l'onglet Actions
+
+# Necessaire pour que le workflow puisse committer le fichier d'etat
+permissions:
+  contents: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout du repo
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Installer les dependances
+        run: pip install -r requirements.txt
+
+      - name: Lancer le watcher
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python3 crous_toulouse_watcher.py
+
+      - name: Sauvegarder l'etat (seen_logements.json)
+        run: |
+          git config user.name "crous-watcher-bot"
+          git config user.email "actions@github.com"
+          git add seen_logements.json
+          git diff --staged --quiet || git commit -m "update: etat des logements [skip ci]"
+          git push
